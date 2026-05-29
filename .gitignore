@@ -5,3 +5,4 @@ outputs/
 .claude/
 deep_learning.zip
 Annotation/
+*.zip
