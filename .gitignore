@@ -2,3 +2,6 @@ env/
 Image/
 __pycache__/
 outputs/
+.claude/
+deep_learning.zip
+Annotation/
