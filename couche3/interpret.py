@@ -27,6 +27,10 @@ Importable :
     interpret.interpret_images(["a.jpg"], model_name="resnet50", use_vlm=False)
 """
 import os
+import sys
+# Bootstrap : permet `python couche3/interpret.py` ET `python -m couche3.interpret`
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import json
 import random
 import argparse
@@ -39,9 +43,9 @@ import matplotlib.pyplot as plt
 
 from config import (IMAGE_DIR, OUTPUT_DIR, DEFAULT_MODEL,
                     model_path, ema_path, class_label)
-from face_detection import detect_and_crop
-from dataset import EVAL_TRANSFORM
-from model import build_model
+from couche1.face_detection import detect_and_crop
+from couche2.dataset import EVAL_TRANSFORM
+from couche2.model import build_model
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -142,7 +146,7 @@ def interpret_image(model, gradcam, image_path, vlm=None):
     }
 
     if vlm is not None:
-        from vision_llm import explain_emotion
+        from couche2.vision_llm import explain_emotion
         ex = explain_emotion(vlm[0], vlm[1], face)
         mentioned = cues_in_text(f"{ex['emotion']} {ex['explanation']}")
         result.update({
@@ -205,7 +209,7 @@ def interpret_images(image_paths, model_name=DEFAULT_MODEL, use_vlm=False,
     vlm = None
     if use_vlm:
         print("  Chargement du Vision-LLM (Qwen2-VL)...")
-        from vision_llm import load_vision_llm
+        from couche2.vision_llm import load_vision_llm
         vlm = load_vision_llm(quantize=quantize)
 
     results = []

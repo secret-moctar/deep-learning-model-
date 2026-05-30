@@ -17,6 +17,9 @@ Usage en script (construit/rafraîchit le cache) :
 """
 import os
 import sys
+# Bootstrap : permet `python couche2/dataset.py` ET `python -m couche2.dataset`
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import numpy as np
 import torch
 from PIL import Image
@@ -24,7 +27,7 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 
 from config import IMAGE_DIR, LABEL_FILE, LABEL_OFFSET, IMG_SIZE, NUM_CLASSES, OUTPUT_DIR
-from face_detection import detect_and_crop
+from couche1.face_detection import detect_and_crop
 
 # Statistiques de normalisation ImageNet (backbone ResNet pré-entraîné).
 IMAGENET_MEAN = [0.485, 0.456, 0.406]

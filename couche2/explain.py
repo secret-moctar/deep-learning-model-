@@ -21,6 +21,10 @@ Importable :
     explain.explain_images(["a.jpg", "b.jpg"], model_name="resnet50")
 """
 import os
+import sys
+# Bootstrap : permet `python couche2/explain.py` ET `python -m couche2.explain`
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import json
 import random
 import argparse
@@ -31,7 +35,7 @@ import matplotlib.pyplot as plt
 
 from config import (IMAGE_DIR, OUTPUT_DIR, CLASS_NAMES, DEFAULT_MODEL,
                     model_path, ema_path, class_label)
-from face_detection import detect_and_crop
+from couche1.face_detection import detect_and_crop
 # vision_llm est importé "à l'usage" (transformers/accelerate sont installés
 # uniquement sur Google Colab — voir requirements.txt).
 
@@ -50,8 +54,8 @@ def load_classifier(model_name, prefer_ema=True):
     if not os.path.exists(ckpt):
         print(f"  ⚠ {ckpt} introuvable — explication sans numéro de classe.")
         return None, None
-    from model import build_model
-    from dataset import EVAL_TRANSFORM
+    from couche2.model import build_model
+    from couche2.dataset import EVAL_TRANSFORM
     model = build_model(model_name, pretrained=False)
     model.load_state_dict(torch.load(ckpt, map_location=device))
     return model.to(device).eval(), EVAL_TRANSFORM
@@ -98,7 +102,7 @@ def save_visualization(face, result, index):
 # ---------------------------------------------------------------------------
 def explain_images(image_paths, model_name=DEFAULT_MODEL, quantize=False):
     """Applique classifieur (numéro) + Vision-LLM (explication) sur des images."""
-    from vision_llm import load_vision_llm, explain_emotion  # lazy import (Colab)
+    from couche2.vision_llm import load_vision_llm, explain_emotion  # lazy import (Colab)
     print("  Chargement du Vision-LLM (Qwen2-VL)...")
     vlm, processor = load_vision_llm(quantize=quantize)
     clf, transform = load_classifier(model_name)

@@ -24,6 +24,10 @@ Importable :
     metrics = evaluate.evaluate_model("resnet50")
 """
 import os
+import sys
+# Bootstrap : permet `python couche2/evaluate.py` ET `python -m couche2.evaluate`
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import json
 import argparse
 
@@ -37,17 +41,22 @@ from sklearn.metrics import (accuracy_score, f1_score, confusion_matrix,
 
 from config import (OUTPUT_DIR, BATCH_SIZE, NUM_CLASSES, CLASS_NAMES,
                     DEFAULT_MODEL, model_path, ema_path, TTA)
-from dataset import FERDataset
-from model import build_model
-from training_utils import tta_logits
+from couche2.dataset import FERDataset
+from couche2.model import build_model
+from couche2.training_utils import tta_logits
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def load_trained_model(model_name, prefer_ema=True):
-    """Reconstruit l'architecture et charge le meilleur checkpoint disponible."""
-    ckpt_main = model_path(model_name)
-    ckpt_ema  = ema_path(model_name)
+def load_trained_model(model_name, prefer_ema=True, run_name=None):
+    """Reconstruit l'architecture (model_name) et charge le checkpoint du run.
+
+    run_name = identifiant des fichiers (défaut = model_name). Sépare l'arch de
+    l'identifiant de run pour permettre plusieurs variantes par architecture.
+    """
+    run_name = run_name or model_name
+    ckpt_main = model_path(run_name)
+    ckpt_ema  = ema_path(run_name)
     if prefer_ema and os.path.exists(ckpt_ema):
         ckpt = ckpt_ema
         tag  = "EMA"
@@ -56,8 +65,8 @@ def load_trained_model(model_name, prefer_ema=True):
         tag  = "raw"
     else:
         raise FileNotFoundError(
-            f"Aucun checkpoint pour {model_name}.\n"
-            f"  Entraîne-le d'abord : python train.py --model {model_name}")
+            f"Aucun checkpoint pour {run_name}.\n"
+            f"  Entraîne-le d'abord : python -m couche2.train --model {model_name}")
     model = build_model(model_name, pretrained=False)
     model.load_state_dict(torch.load(ckpt, map_location=device))
     print(f"  [{tag}] {os.path.basename(ckpt)}")
@@ -135,13 +144,18 @@ def _plot_confusion(y_true, y_pred, model_name):
     print(f"  [✓] {out}")
 
 
-def evaluate_model(model_name=DEFAULT_MODEL, prefer_ema=True, use_tta=True):
-    """Évalue un modèle, génère les graphiques et retourne le dict des métriques."""
+def evaluate_model(model_name=DEFAULT_MODEL, prefer_ema=True, use_tta=True, run_name=None):
+    """Évalue un modèle, génère les graphiques et retourne le dict des métriques.
+
+    model_name : architecture (passée à build_model).
+    run_name   : identifiant pour les fichiers (poids, report, metrics). Défaut = model_name.
+    """
+    run_name = run_name or model_name
     print("=" * 60)
-    print(f"  ÉVALUATION — {model_name} · TTA={use_tta} · EMA={prefer_ema}")
+    print(f"  ÉVALUATION — arch={model_name} run={run_name} · TTA={use_tta} · EMA={prefer_ema}")
     print("=" * 60)
 
-    model = load_trained_model(model_name, prefer_ema=prefer_ema)
+    model = load_trained_model(model_name, prefer_ema=prefer_ema, run_name=run_name)
     yt_tr, yp_tr = predict_split(model, "train", use_tta=use_tta)
     yt_te, yp_te = predict_split(model, "test",  use_tta=use_tta)
 
@@ -161,17 +175,18 @@ def evaluate_model(model_name=DEFAULT_MODEL, prefer_ema=True, use_tta=True):
                                    target_names=[f"Classe {n}" for n in CLASS_NAMES],
                                    zero_division=0)
     print(f"\n{report}")
-    with open(os.path.join(OUTPUT_DIR, f"report_{model_name}.txt"), "w") as f:
-        f.write(f"Modèle: {model_name}\n")
+    with open(os.path.join(OUTPUT_DIR, f"report_{run_name}.txt"), "w") as f:
+        f.write(f"Run: {run_name}   Arch: {model_name}\n")
         f.write(f"Accuracy train/test: {train_acc:.4f} / {test_acc:.4f}\n")
         f.write(f"Macro-F1 train/test: {train_f1:.4f} / {test_f1:.4f}\n\n{report}")
 
-    _plot_overall(train_acc, test_acc, model_name)
-    _plot_per_class(train_pc, test_pc, model_name)
-    _plot_confusion(yt_te, yp_te, model_name)
+    _plot_overall(train_acc, test_acc, run_name)
+    _plot_per_class(train_pc, test_pc, run_name)
+    _plot_confusion(yt_te, yp_te, run_name)
 
     metrics = {
-        "model": model_name,
+        "name":  run_name,
+        "arch":  model_name,
         "accuracy": {"train": float(train_acc), "test": float(test_acc)},
         "macro_f1": {"train": float(train_f1), "test": float(test_f1)},
         "per_class_accuracy": {CLASS_NAMES[c]: {"train": float(train_pc[c]),
@@ -180,9 +195,9 @@ def evaluate_model(model_name=DEFAULT_MODEL, prefer_ema=True, use_tta=True):
         "ema_used": prefer_ema,
         "tta": use_tta,
     }
-    with open(os.path.join(OUTPUT_DIR, f"metrics_{model_name}.json"), "w") as f:
+    with open(os.path.join(OUTPUT_DIR, f"metrics_{run_name}.json"), "w") as f:
         json.dump(metrics, f, indent=2)
-    print(f"  [✓] metrics_{model_name}.json\n  ✅ Évaluation terminée")
+    print(f"  [✓] metrics_{run_name}.json\n  ✅ Évaluation terminée")
     return metrics
 
 

@@ -1,16 +1,21 @@
 #!/usr/bin/env python3
 """
-02_preprocessing.py — Pipeline : detection → augmentation → normalisation
+couche1/preprocessing.py — Pipeline démo : detection → augmentation → normalisation
 """
 
 import os
+import sys
+# Bootstrap : permet `python couche1/preprocessing.py` ET `python -m couche1.preprocessing`
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, TensorDataset
+
 from config import IMAGE_DIR, LABEL_FILE, IMG_SIZE, LABEL_OFFSET, NUM_CLASSES, BATCH_SIZE
-from face_detection import detect_and_crop
-from normalization import normalize_image
-from augmentation import augment_image
+from couche1.face_detection import detect_and_crop
+from couche1.normalization import normalize_image
+from couche1.augmentation import augment_image
 
 
 def process_one_image(image_path, augment=False, model="resnet"):

@@ -1,5 +1,8 @@
 import os
 import sys
+# Bootstrap : permet `python couche1/face_detection.py` ET `python -m couche1.face_detection`
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from PIL import Image
 from config import BBOX_DIR, OUTPUT_DIR
 

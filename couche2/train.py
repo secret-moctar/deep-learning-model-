@@ -25,6 +25,10 @@ Importable :
     train.train_model("resnet50", epochs=45)
 """
 import os
+import sys
+# Bootstrap : permet `python couche2/train.py` ET `python -m couche2.train`
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import json
 import argparse
 
@@ -40,10 +44,10 @@ from config import (OUTPUT_DIR, BATCH_SIZE, EPOCHS, WARMUP_EPOCHS, LR_HEAD,
                     DEFAULT_MODEL, model_path, ema_path,
                     USE_MIXUP, MIXUP_ALPHA, USE_CUTMIX, CUTMIX_ALPHA,
                     USE_EMA, EMA_DECAY, USE_FOCAL, FOCAL_GAMMA, TTA)
-from dataset import FERDataset
-from model import build_model, set_backbone_trainable, param_groups
-from training_utils import (mixup_data, cutmix_data, mixup_criterion,
-                            FocalLoss, ModelEMA, tta_logits)
+from couche2.dataset import FERDataset
+from couche2.model import build_model, set_backbone_trainable, param_groups
+from couche2.training_utils import (mixup_data, cutmix_data, mixup_criterion,
+                                    FocalLoss, ModelEMA, tta_logits)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -158,12 +162,19 @@ def _plot_curves(history, model_name):
 # ---------------------------------------------------------------------------
 # Fonction principale
 # ---------------------------------------------------------------------------
-def train_model(model_name=DEFAULT_MODEL, epochs=EPOCHS):
-    """Entraîne un modèle et sauvegarde le meilleur checkpoint. Retourne l'historique."""
+def train_model(model_name=DEFAULT_MODEL, epochs=EPOCHS, run_name=None):
+    """Entraîne un modèle et sauvegarde le meilleur checkpoint. Retourne l'historique.
+
+    model_name : architecture passée à `build_model` (ex. "resnet50").
+    run_name   : identifiant pour les fichiers de sortie (poids, history, curves).
+                 Défaut = model_name. Utilisé par sweep.py pour distinguer plusieurs
+                 runs de la même architecture avec hyperparams différents.
+    """
+    run_name = run_name or model_name
     torch.manual_seed(SEED)
     np.random.seed(SEED)
     print("=" * 72)
-    print(f"  ENTRAÎNEMENT — {model_name}")
+    print(f"  ENTRAÎNEMENT — arch={model_name}   run={run_name}")
     print(f"  Device: {device} · Epochs: {epochs} · Batch: {BATCH_SIZE}")
     print(f"  MixUp:{USE_MIXUP}  CutMix:{USE_CUTMIX}  EMA:{USE_EMA}  Focal:{USE_FOCAL}  TTA:{TTA}")
     print("=" * 72)
@@ -198,8 +209,8 @@ def train_model(model_name=DEFAULT_MODEL, epochs=EPOCHS):
               {f"{s}_{k}": [] for s in ("train", "test")
                for k in ("loss", "acc", "f1")}
     best_f1 = 0.0
-    ckpt = model_path(model_name)
-    ekpt = ema_path(model_name)
+    ckpt = model_path(run_name)
+    ekpt = ema_path(run_name)
 
     head = (f"  {'Ep':>3s} | {'phase':<8s} | "
             f"{'T.loss':>7s} {'T.acc':>6s} {'T.f1':>6s} | "
@@ -253,12 +264,12 @@ def train_model(model_name=DEFAULT_MODEL, epochs=EPOCHS):
             line += " ★"
         print(line)
 
-    _plot_curves(history, model_name)
-    with open(os.path.join(OUTPUT_DIR, f"history_{model_name}.json"), "w") as f:
+    _plot_curves(history, run_name)
+    with open(os.path.join(OUTPUT_DIR, f"history_{run_name}.json"), "w") as f:
         json.dump(history, f, indent=2)
 
     best_acc = (max(history["ema_acc"]) if ema else max(history["test_acc"]))
-    print(f"\n  ✅ {model_name} terminé — best macro-F1: {best_f1:.4f}"
+    print(f"\n  ✅ {run_name} terminé — best macro-F1: {best_f1:.4f}"
           f" | best accuracy: {best_acc:.4f}")
     print(f"  [✓] Poids : {ckpt}")
     if ema:

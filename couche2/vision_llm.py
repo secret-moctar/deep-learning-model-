@@ -26,6 +26,10 @@ Le modèle (~4.5 Go) n'est pas téléchargé en local. Sur Colab :
     print(res["emotion"], "|", res["explanation"])
 ------------------------------------------------------------------------------
 """
+import os, sys
+# Bootstrap : permet l'import même si lancé directement
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import torch
 from PIL import Image
 from transformers import Qwen2VLForConditionalGeneration, AutoProcessor

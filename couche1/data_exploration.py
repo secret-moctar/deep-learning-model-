@@ -12,6 +12,9 @@ Analyse la répartition des 11 classes (numéros 1..11) et affiche des
 Usage :  python data_exploration.py
 """
 import os
+import sys
+# Bootstrap : permet `python couche1/data_exploration.py` ET `python -m couche1.data_exploration`
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import matplotlib.pyplot as plt
 from PIL import Image

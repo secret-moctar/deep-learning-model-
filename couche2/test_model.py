@@ -1,21 +1,24 @@
 #!/usr/bin/env python3
 """
-main_test_model.py — Inférence sur des images individuelles (Couche 2)
-======================================================================
+couche2/test_model.py — Inférence sur des images individuelles (Couche 2)
+========================================================================
 
 Charge un classifieur entraîné et prédit le NUMÉRO de classe (1..11) d'une
 image, avec une visualisation : image originale, visage recadré, top-3.
 
 Usage :
-    python main_test_model.py
-    python main_test_model.py --model resnet50
+    python -m couche2.test_model
+    python -m couche2.test_model --model resnet50
 
 Importable :
-    import main_test_model
-    model = main_test_model.load_classifier("resnet50")
+    from couche2 import test_model
+    model = test_model.load_classifier("resnet50")
 """
 import os
 import sys
+# Bootstrap : permet `python couche2/test_model.py` ET `python -m couche2.test_model`
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import random
 import argparse
 
@@ -25,9 +28,9 @@ from PIL import Image
 
 from config import (LABEL_FILE, LABEL_OFFSET, IMAGE_DIR, OUTPUT_DIR,
                     DEFAULT_MODEL, model_path, ema_path, class_label)
-from face_detection import detect_and_crop
-from dataset import EVAL_TRANSFORM
-from model import build_model
+from couche1.face_detection import detect_and_crop
+from couche2.dataset import EVAL_TRANSFORM
+from couche2.model import build_model
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -42,7 +45,7 @@ def load_classifier(model_name=DEFAULT_MODEL, prefer_ema=True):
         ckpt = ckpt_main
     else:
         print(f"  ✗ Modèle non trouvé : {ckpt_main}")
-        print(f"    Entraîne-le d'abord : python train.py --model {model_name}")
+        print(f"    Entraîne-le d'abord : python -m couche2.train --model {model_name}")
         sys.exit(1)
     model = build_model(model_name, pretrained=False)
     model.load_state_dict(torch.load(ckpt, map_location=device))

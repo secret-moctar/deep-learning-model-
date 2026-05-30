@@ -17,6 +17,10 @@ Fonctions :
   set_backbone_trainable() -> gèle / dégèle le backbone
   param_groups()           -> 2 groupes de LR (backbone lent / tête rapide)
 """
+import os, sys
+# Bootstrap : permet l'import même si lancé directement
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import torch.nn as nn
 from torchvision import models as tvmodels
 

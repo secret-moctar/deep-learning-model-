@@ -33,15 +33,15 @@ import time
 
 from config import DEFAULT_MODEL
 
-# (flag, module, description, fait_partie_de_--all)
+# (flag, module dotté, description, fait_partie_de_--all)
 STEPS = [
-    ("explore",    "data_exploration", "Couche 1 — Exploration du dataset",   True),
-    ("check",      "check_dataset",    "Couche 1 — Vérification du dataset",  True),
-    ("preprocess", "preprocessing",    "Couche 1 — Test du prétraitement",    True),
-    ("train",      "train",            "Couche 2 — Entraînement",             True),
-    ("evaluate",   "evaluate",         "Couche 2 — Évaluation",               True),
-    ("explain",    "explain",          "Couche 2 — Explication Vision-LLM",   False),
-    ("interpret",  "interpret",        "Couche 3 — Interprétation (Grad-CAM)", False),
+    ("explore",    "couche1.data_exploration", "Couche 1 — Exploration du dataset",   True),
+    ("check",      "couche1.check_dataset",    "Couche 1 — Vérification du dataset",  True),
+    ("preprocess", "couche1.preprocessing",    "Couche 1 — Test du prétraitement",    True),
+    ("train",      "couche2.train",            "Couche 2 — Entraînement",             True),
+    ("evaluate",   "couche2.evaluate",         "Couche 2 — Évaluation",               True),
+    ("explain",    "couche2.explain",          "Couche 2 — Explication Vision-LLM",   False),
+    ("interpret",  "couche3.interpret",        "Couche 3 — Interprétation (Grad-CAM)", False),
 ]
 
 
@@ -54,7 +54,7 @@ def run_step(module_name, desc):
         if hasattr(module, "main"):
             module.main()
         else:
-            os.system(f"{sys.executable} {module_name}.py")
+            os.system(f"{sys.executable} -m {module_name}")
         print(f"  ✅ {desc} ({time.time() - start:.1f}s)")
         return True
     except Exception as exc:

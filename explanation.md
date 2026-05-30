@@ -41,14 +41,14 @@ visages, à partir du dataset **RAF-DB**.
   - **Vision-LLM** (Qwen2-VL en zero-shot) → une **explication textuelle**
     des indices faciaux.
 
-Le projet est organisé en **3 couches** :
+Le projet est organisé en **3 couches** (un sous-dossier par couche) :
 
 | Couche | Rôle | Scripts |
 |--------|------|---------|
-| **1** | Préparer / aligner les données | `face_detection.py`, `augmentation.py`, `normalization.py`, `check_dataset.py`, `data_exploration.py`, `preprocessing.py` |
-| **2** | Entraîner et expliquer | `dataset.py`, `model.py`, `training_utils.py`, `train.py`, `evaluate.py`, `vision_llm.py`, `explain.py`, `main_test_model.py` |
-| **3** | Interpréter (XAI) | `interpret.py` |
-| **Orchestration** | Lanceurs | `main.py`, `run_local.py`, `demo_fer_ce.ipynb` |
+| **1** | Préparer / aligner les données | `couche1/face_detection.py`, `couche1/augmentation.py`, `couche1/normalization.py`, `couche1/check_dataset.py`, `couche1/data_exploration.py`, `couche1/preprocessing.py` |
+| **2** | Entraîner et expliquer | `couche2/dataset.py`, `couche2/model.py`, `couche2/training_utils.py`, `couche2/train.py`, `couche2/evaluate.py`, `couche2/vision_llm.py`, `couche2/explain.py`, `couche2/test_model.py` |
+| **3** | Interpréter (XAI) | `couche3/interpret.py` |
+| **Orchestration** | Lanceurs | `main.py`, `run_local.py`, **`sweep.py`** (multi-modèles + rapport), `demo_fer_ce.ipynb` |
 
 ---
 
@@ -72,7 +72,7 @@ Le projet est organisé en **3 couches** :
                         │                                          │
               ┌─────────┼──────────────┐                           │
               ▼         ▼              ▼                           ▼
-        evaluate.py  main_test_model  explain.py ◀──────────────────┘
+        evaluate.py    test_model.py   explain.py ◀──────────────────┘
        (métriques)   (1 image)       (numéro + explication)
                         │
                         ▼  ┌──────────── COUCHE 3 ─────────────┐
@@ -93,39 +93,43 @@ que ce que le modèle *regarde* (Grad-CAM) correspond à ce que le Vision-LLM
 deep_learning/
 ├── config.py              Configuration centrale (TOUT se règle ici)
 │
-│  ── COUCHE 1 ──
-├── face_detection.py      Recadrage du visage (bbox RAF-DB / MTCNN)
-├── augmentation.py        Augmentations "maison" (flip, rotation, éclairage, occlusion)
-├── normalization.py       Resize + normalisation mean/std (multi-modèles)
-├── check_dataset.py       Vérification d'intégrité du dataset
-├── data_exploration.py    Distribution des classes + échantillons (par numéro)
-├── preprocessing.py       Démonstration du pipeline Couche 1
+├── couche1/                          ── COUCHE 1 ──
+│   ├── face_detection.py     Recadrage du visage (bbox RAF-DB / MTCNN)
+│   ├── augmentation.py       Augmentations "maison" (flip, rotation, éclairage, occlusion)
+│   ├── normalization.py      Resize + normalisation mean/std (multi-modèles)
+│   ├── check_dataset.py      Vérification d'intégrité du dataset
+│   ├── data_exploration.py   Distribution des classes + échantillons (par numéro)
+│   └── preprocessing.py      Démonstration du pipeline Couche 1
 │
-│  ── COUCHE 2 ──
-├── dataset.py             Dataset PyTorch (cache visages + augmentation à la volée)
-├── model.py               Constructeur des modèles (ResNet / ViT / Swin)
-├── training_utils.py      MixUp · CutMix · Focal-Loss · EMA · TTA
-├── train.py               Entraînement (2 phases, MixUp/CutMix, EMA, cosine LR, AMP)
-├── evaluate.py            Évaluation (accuracy, F1, confusion, EMA, TTA)
-├── vision_llm.py          Vision-LLM Qwen2-VL (explication, zero-shot)
-├── explain.py             Pipeline classifieur + Vision-LLM
-├── main_test_model.py     Inférence interactive sur 1 image (top-3)
+├── couche2/                          ── COUCHE 2 ──
+│   ├── dataset.py            Dataset PyTorch (cache visages + augmentation à la volée)
+│   ├── model.py              Constructeur des modèles (ResNet / ViT / Swin)
+│   ├── training_utils.py     MixUp · CutMix · Focal-Loss · EMA · TTA
+│   ├── train.py              Entraînement (2 phases, MixUp/CutMix, EMA, cosine LR, AMP)
+│   ├── evaluate.py           Évaluation (accuracy, F1, confusion, EMA, TTA)
+│   ├── vision_llm.py         Vision-LLM Qwen2-VL (explication, zero-shot)
+│   ├── explain.py            Pipeline classifieur + Vision-LLM
+│   └── test_model.py         Inférence interactive sur 1 image (top-3)
 │
-│  ── COUCHE 3 ──
-├── interpret.py           Grad-CAM + cohérence image/texte
+├── couche3/                          ── COUCHE 3 ──
+│   └── interpret.py          Grad-CAM + cohérence image/texte
 │
 │  ── ORCHESTRATION ──
 ├── main.py                Orchestrateur ligne de commande (étapes individuelles)
-├── run_local.py           Lanceur "tout-en-un" + registry des modèles
-├── demo_fer_ce.ipynb      Notebook Colab (démo complète)
+├── run_local.py           Lanceur "tout-en-un" 1 modèle + registry JSON
+├── sweep.py               Sweep multi-modèles / multi-hyperparams + rapport auto
+├── demo_fer_ce.ipynb      Notebook Colab (démo complète, fait du sweep léger)
 │
 ├── Image/ Annotation/ EmoLabel/   Données RAF-DB (présentes localement
 │                                    ou dézippées sur Colab)
-└── outputs/               Modèles, graphiques, métriques générés
+└── outputs/               Modèles, graphiques, métriques + sweep_report.md
 ```
 
-**Tous les scripts sont importables** (noms de modules valides) — utilisables
-dans un notebook : `import train`, `from evaluate import evaluate_model`, etc.
+**Tous les scripts sont importables** (packages Python valides) — depuis un
+notebook ou un autre script : `from couche2.train import train_model`,
+`from couche3.interpret import GradCAM`, etc. Chaque module a un petit
+bootstrap `sys.path` en tête qui permet aussi de l'exécuter directement
+(`python couche2/train.py …`) ou en module (`python -m couche2.train …`).
 `vision_llm.py` et `explain.py` font un import *lazy* de `transformers` pour
 fonctionner partout, même sans la librairie installée.
 
@@ -179,7 +183,7 @@ hors dataset).
 | `_get_mtcnn`       | `_get_mtcnn()` | Charge MTCNN une seule fois (cache global). Affiche un avertissement si `facenet-pytorch` n'est pas installé. |
 | `_crop_with_mtcnn` | `_crop_with_mtcnn(image_path, margin=0.1)` | Détection MTCNN du visage le plus grand, recadrage avec marge. |
 | `detect_and_crop`  | `detect_and_crop(image_path, mode="bbox", margin=0.1)` | **Point d'entrée** : dispatche `bbox` ou `auto`. |
-| `main`             | `main()` | CLI : `python face_detection.py <image> [--auto]` → sauve `outputs/face_cropped_<mode>.png`. |
+| `main`             | `main()` | CLI : `python -m couche1.face_detection <image> [--auto]` → sauve `outputs/face_cropped_<mode>.png`. |
 
 ### 5.2 `augmentation.py`
 
@@ -194,7 +198,7 @@ Augmentations aléatoires "maison" (démonstration / réutilisable). En Couche 2
 | `random_contrast`   | `random_contrast(img, factor_range=(0.7, 1.3))` | Variation de contraste. |
 | `random_occlusion`  | `random_occlusion(img, max_patches=2, max_size_ratio=0.15)` | Patches noirs aléatoires (occlusions). |
 | `augment_image`     | `augment_image(pil_image)` | **Chaîne complète** : flip → rotation → brightness → contrast → occlusion (p=0.3). |
-| *script `__main__`* | — | CLI : `python augmentation.py <image>` → grille de démos dans `outputs/augmentation_demo.png`. |
+| *script `__main__`* | — | CLI : `python -m couche1.augmentation <image>` → grille de démos dans `outputs/augmentation_demo.png`. |
 
 ### 5.3 `normalization.py`
 
@@ -205,7 +209,7 @@ Resize + normalisation mean/std selon le modèle cible.
 | `NORM_PARAMS`         | dict | Paramètres par modèle : `resnet`/`vit` (ImageNet 224), `clip`, `simple` (juste `[0,1]`). |
 | `normalize_image`     | `normalize_image(pil_image, model="resnet", size=None)` | Resize → `float32 [0,1]` → `(C,H,W)` → (mean, std). Retourne numpy. |
 | `denormalize_image`   | `denormalize_image(tensor_chw, model="resnet")` | Inverse de `normalize_image` → `(H,W,C) uint8` pour affichage. |
-| *script `__main__`*   | — | CLI : `python normalization.py <image> [--model X]` → preview dans `outputs/normalized_<model>.png`. |
+| *script `__main__`*   | — | CLI : `python -m couche1.normalization <image> [--model X]` → preview dans `outputs/normalized_<model>.png`. |
 
 ### 5.4 `check_dataset.py`
 
@@ -266,7 +270,7 @@ Cache des visages recadrés + augmentation à la volée via `torchvision`.
 | `FERDataset.__getitem__`| `(idx)` | Renvoie `(tensor, label)` — augmentation à la volée si `train=True`. |
 | `FERDataset.class_counts` | — | `np.bincount` des labels. |
 | `FERDataset.sample_weights` | — | Poids par image pour `WeightedRandomSampler` (équilibre les classes rares). |
-| *script `__main__`* | — | CLI : `python dataset.py [--rebuild]` reconstruit le cache. |
+| *script `__main__`* | — | CLI : `python -m couche2.dataset [--rebuild]` reconstruit le cache. |
 
 ### 6.2 `model.py` — architectures
 
@@ -342,7 +346,7 @@ Pipeline complet pour une image : classe (numéro) + explication textuelle.
 | `explain_images`     | `explain_images(image_paths, model_name=DEFAULT_MODEL, quantize=False)` | **Fonction principale**. Boucle : recadrage → classifieur (numéro) → `explain_emotion` (texte) → sauvegarde + JSON `outputs/explanations.json`. Import *lazy* de `vision_llm` (Colab only). |
 | `main`               | `main()` | CLI : `--model`, `--n`. Échantillonne aléatoirement N images de test. |
 
-### 6.8 `main_test_model.py` — inférence interactive
+### 6.8 `couche2/test_model.py` — inférence interactive
 
 | Fonction | Signature | Rôle |
 |----------|-----------|------|
@@ -396,17 +400,18 @@ CLI minimaliste qui sélectionne et exécute des étapes individuelles.
 
 | Élément | Rôle |
 |---------|------|
-| `STEPS` (liste) | `(flag, module, description, fait_partie_de_--all)` pour `explore`, `check`, `preprocess`, `train`, `evaluate`, `explain`, `interpret`. |
-| `run_step(module_name, desc)` | Importe le module, appelle `main()`, mesure le temps, gère les erreurs. |
+| `STEPS` (liste) | `(flag, module_dotté, description, fait_partie_de_--all)` — modules nouveaux : `couche1.data_exploration`, `couche1.check_dataset`, `couche1.preprocessing`, `couche2.train`, `couche2.evaluate`, `couche2.explain`, `couche3.interpret`. |
+| `run_step(module_name, desc)` | Importe le module (chemin dotté), appelle `main()`, mesure le temps, gère les erreurs. |
 | `main()` | Parse les flags, exécute les étapes choisies, affiche un récap. |
 
 Exemples : `python main.py --explore --check`, `python main.py --all`.
 
-### 8.2 `run_local.py` — pipeline tout-en-un + registry des modèles
+### 8.2 `run_local.py` — pipeline tout-en-un + registry des runs
 
 Lance `check → train → evaluate → register` et tient à jour un **registry**
-(`outputs/registry.json`) qui liste tous les modèles entraînés avec leurs
-métriques, leurs poids, leurs hyper-paramètres et leur environnement.
+(`outputs/registry.json`) qui liste tous les runs entraînés avec leurs
+métriques, leurs poids, leurs hyper-paramètres, leurs overrides et leur
+environnement.
 
 | Élément | Signature | Rôle |
 |---------|-----------|------|
@@ -414,8 +419,8 @@ métriques, leurs poids, leurs hyper-paramètres et leur environnement.
 | `_load_registry`       | `_load_registry()` | Lit le JSON ou renvoie `{"models": {}}`. |
 | `_save_registry`       | `_save_registry(reg)` | Écrit le JSON (`indent=2`). |
 | `list_models`          | `list_models()` | Affiche un tableau (nom, test acc, test F1, date). |
-| `register_model`       | `register_model(model_name, metrics, epochs_run)` | Ajoute / met à jour l'entrée d'un modèle dans la registry. Contient : `weights {raw, ema}`, `artifacts {history, curves, metrics, report, overall, per_class, confusion}`, `hyperparams {epochs, batch, LR, mixup, ema, focal, tta, …}`, `environment {python, torch, cuda, device}`, `metrics`, `registered_at`. |
-| `load_registered_model`| `load_registered_model(model_name, prefer_ema=True)` | Recharge l'architecture (`build_model`) + les meilleurs poids (EMA prioritaire). Renvoie `(model, info_dict)`. |
+| `register_model`       | `register_model(name, metrics, epochs_run, arch=None, overrides=None)` | Ajoute / met à jour un run dans la registry. `name` = clé (peut différer de l'arch pour le sweep). Contient : `arch`, `weights {raw, ema}`, `artifacts {history, curves, metrics, report, overall, per_class, confusion}`, `hyperparams {epochs, batch, LR, mixup, ema, focal, tta, overrides…}`, `environment {python, torch, cuda, device}`, `metrics`, `registered_at`. Lit `config.X` en **live** → compatible avec les overrides du sweep. |
+| `load_registered_model`| `load_registered_model(name, prefer_ema=True)` | Recharge l'architecture (`build_model(info.arch)`) + les meilleurs poids (EMA prioritaire). Renvoie `(model, info_dict)`. |
 | `_print_header`        | `_print_header(title)` | Cadre console. |
 | `run_pipeline`         | `run_pipeline(model_name=DEFAULT_MODEL, epochs=EPOCHS, skip_check=False, skip_train=False)` | Pipeline complet : `check_dataset.main()` → `train.train_model(...)` → `evaluate.evaluate_model(...)` → `register_model(...)`. |
 | `main`                 | `main()` | CLI : `--model`, `--epochs`, `--all-models`, `--skip-check`, `--skip-train`, `--list`, `--load`. |
@@ -427,23 +432,70 @@ from run_local import (run_pipeline, register_model, list_models,
 model, info = load_registered_model("resnet50")     # EMA si dispo
 ```
 
+### 8.3 `sweep.py` — sweep multi-modèles + rapport auto
+
+Lance **plusieurs runs** en faisant varier l'architecture ou des hyper-
+paramètres (MixUp, CutMix, EMA, Focal-Loss, batch size, LR, époques…), puis
+génère un **rapport markdown présentable** avec graphes et analyse.
+
+**Deux presets fournis :**
+
+| Preset | Runs | Cible matérielle | Temps approximatif |
+|--------|------|------------------|---------------------|
+| `SWEEP_COLAB` | 6 (10 epochs) | T4 gratuit / Colab | ~1-2 h |
+| `SWEEP_LOCAL` | 13 (15-25 epochs) | RTX 3090 ou supérieur | ~3-5 h |
+
+| Élément | Signature | Rôle |
+|---------|-----------|------|
+| `SWEEP_COLAB`, `SWEEP_LOCAL` | constantes | Liste de specs `{run_name, arch, epochs, overrides}`. |
+| `PRESETS` | dict | Mapping `{"colab": …, "local": …}`. |
+| `REPORT_MD`, `COMPARISON_PNG`, `CURVES_PNG`, `RESULTS_JSON` | chemins | Fichiers de sortie du rapport. |
+| `_apply_overrides(overrides)` | `dict → dict` | Modifie `config.X` selon le dict ; renvoie les valeurs originales. |
+| `_restore(originals)` | `dict → None` | Restaure `config` à son état d'origine. |
+| `run_one(spec)` | `spec → résumé dict` | Applique les overrides → recharge `couche2.train` et `couche2.evaluate` (pour qu'ils re-bindent les `from config import X`) → entraîne → évalue → enregistre dans la registry → restaure. Capture les erreurs. |
+| `_diagnose(spec, history, metrics, best_test_acc)` | → str markdown | Heuristique : détecte sur-/sous-apprentissage, divergence, effets attendus des overrides (MixUp off, EMA off, LR trop haut…). |
+| `_plot_comparison(results)` | — | Bar chart Acc + F1 par run, **meilleur en doré**. |
+| `_plot_curves(results)` | — | Courbes test_acc (ou EMA si dispo) superposées. |
+| `_markdown_table(results)` | → str | Tableau classé par accuracy test décroissante. |
+| `write_report(results, preset)` | — | Génère `sweep_report.md` (+ les 2 PNG + le JSON brut). |
+| `reload_from_disk(preset)` | → list | Mode `--report-only` : reconstruit les results depuis `metrics_<run>.json`. |
+| `list_presets()` | — | Affiche presets + détail de chaque run. |
+| `main()` | CLI | `--preset {colab,local}`, `--only run1,run2`, `--list`, `--report-only`. |
+
+**Exemples :**
+
+```bash
+python sweep.py --preset colab                # sweep léger
+python sweep.py --preset local                # sweep complet (RTX 3090)
+python sweep.py --preset local --only resnet50_focal,resnet50_no_ema
+python sweep.py --list                        # juste lister les presets
+python sweep.py --preset local --report-only  # régénère le rapport sans réentraîner
+```
+
+**Sorties :**
+* `outputs/sweep_report.md` — rapport markdown (tableau + analyse run par run + synthèse "pourquoi ça dégrade")
+* `outputs/sweep_comparison.png` — bar chart Acc / F1
+* `outputs/sweep_curves.png` — courbes test_acc superposées
+* `outputs/sweep_results.json` — données brutes
+
 ---
 
 ## 9. Notebook Colab — `demo_fer_ce.ipynb`
 
-Notebook auto-portant, 8 sections, fait tourner le projet de bout en bout
-sur Colab (GPU gratuit). Voir le README pour le déroulé d'usage.
+Notebook auto-portant, **8 sections** (cf. `README_COLAB.md` pour le déroulé
+détaillé), fait tourner tout le projet sur Colab T4 avec le **preset Colab du
+sweep**.
 
 | Section | Contenu |
 |---------|---------|
-| **1. Préparation** | Détection GPU, mount Drive, dézippage de `deep_learning.zip` + sous-zips `Image.zip`/`Annotation.zip`/`EmoLabel.zip`, install `transformers accelerate bitsandbytes timm seaborn pillow<12`, smoke-test des imports. |
-| **2. Audit Couche 1** | `data_exploration.main()`, `check_dataset.main()`, build du cache `FERDataset`, visualisations. |
-| **3. Entraînement** | Boucle sur `config.MODELS` (ResNet-50, ViT, Swin) avec `train.train_model(...)`. |
-| **4. Évaluation & comparaison** | `evaluate.evaluate_model(...)` pour chaque modèle + bar chart comparatif. |
-| **5. Inférence individuelle** | `main_test_model.test_one_image(...)` sur quelques images aléatoires, top-3. |
-| **6. Vision-LLM** | `explain.explain_images(...)` (Qwen2-VL zero-shot). |
-| **7. Couche 3** | `interpret.interpret_images(..., use_vlm=True)` (Grad-CAM + cohérence). |
-| **8. Conclusion** | Résumé + sauvegarde optionnelle vers Drive. |
+| **1. Préparation** | GPU, mount Drive, dézip `deep_learning.zip` + sous-zips, `pip install transformers accelerate bitsandbytes timm seaborn pillow<12`, smoke-test des imports (`couche1.X`, `couche2.X`, `couche3.X`, `sweep`, `run_local`). |
+| **2. Audit Couche 1** | `couche1.data_exploration.main()`, `couche1.check_dataset.main()`, build du cache `FERDataset`, visualisations. |
+| **3. Sweep multi-modèles** | `sweep.list_presets()` puis `[sweep.run_one(s) for s in sweep.SWEEP_COLAB]` → 6 runs courts, `sweep.write_report(...)`. |
+| **4. Sélection + inférence** | Lit la registry, identifie le meilleur run, charge via `run_local.load_registered_model(...)`, top-3 sur quelques images. |
+| **5. Vision-LLM** | `couche2.explain.explain_images(...)` (Qwen2-VL zero-shot). |
+| **6. Couche 3** | `couche3.interpret.interpret_images(..., use_vlm=True)` (Grad-CAM + cohérence). |
+| **7. Rapport final** | Affiche `sweep_report.md` inline en Markdown + graphes : **c'est la cellule prévue pour la présentation à la classe**. |
+| **8. Sauvegarde Drive** | (optionnel) copie `outputs/` vers Drive avant la fin de session. |
 
 ---
 
@@ -488,14 +540,17 @@ sur Colab (GPU gratuit). Voir le README pour le déroulé d'usage.
 | Passer à Focal-Loss | `USE_FOCAL = True`, `FOCAL_GAMMA = 2.0` |
 | Désactiver le TTA | `TTA = False` (ou `--no-tta` côté CLI eval) |
 | Ajouter une architecture | Compléter `MODELS` (n'importe quel nom `timm`) |
-| Entraîner un autre modèle | `python train.py --model vit_base_patch16_224` |
+| Entraîner un autre modèle | `python -m couche2.train --model vit_base_patch16_224` |
 | Tout-en-un + registry | `python run_local.py --model resnet50` |
-| Lister les modèles enregistrés | `python run_local.py --list` |
-| Recharger un modèle enregistré | `python run_local.py --load resnet50` |
+| **Comparer plusieurs hyperparams** | **`python sweep.py --preset local`** (ou `--preset colab`) |
+| **Sweep d'un sous-ensemble** | `python sweep.py --preset local --only resnet50_baseline,resnet50_focal` |
+| **Rapport sans réentraîner** | `python sweep.py --preset local --report-only` |
+| Lister les runs enregistrés | `python run_local.py --list` |
+| Recharger un run enregistré | `python run_local.py --load resnet50_focal` |
 | Changer le Vision-LLM | `VLM_MODEL_ID` dans `config.py` |
 | Réduire le sur-apprentissage | Augmenter `WEIGHT_DECAY` ; renforcer `TRAIN_TRANSFORM` ; activer Focal-Loss |
-| Reconstruire le cache des visages | `python dataset.py --rebuild` |
-| Changer la tête d'un modèle | Éditer `build_model()` dans `model.py` |
+| Reconstruire le cache des visages | `python -m couche2.dataset --rebuild` |
+| Changer la tête d'un modèle | Éditer `build_model()` dans `couche2/model.py` |
 | Quel script fait quoi | Cf. §3 (Carte) + §5–7 (référence) |
 
 > **Règle d'or :** un réglage = une variable dans `config.py`. Ne code jamais

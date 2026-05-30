@@ -23,6 +23,9 @@ Usage en module :
 
 import os
 import sys
+# Bootstrap : permet `python couche1/augmentation.py` ET `python -m couche1.augmentation`
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import random
 import numpy as np
 from PIL import Image, ImageEnhance

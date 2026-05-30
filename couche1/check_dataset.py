@@ -18,6 +18,9 @@ Usage :
 
 import os
 import sys
+# Bootstrap : permet `python couche1/check_dataset.py` ET `python -m couche1.check_dataset`
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from PIL import Image
 from config import IMAGE_DIR, LABEL_FILE, BBOX_DIR, OUTPUT_DIR, LABEL_OFFSET, NUM_CLASSES
 

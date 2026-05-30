@@ -24,6 +24,9 @@ Usage en module :
 
 import os
 import sys
+# Bootstrap : permet `python couche1/normalization.py` ET `python -m couche1.normalization`
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import numpy as np
 from PIL import Image
 from config import IMG_SIZE, OUTPUT_DIR

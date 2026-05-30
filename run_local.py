@@ -37,10 +37,9 @@ import platform
 
 import torch
 
-from config import (OUTPUT_DIR, MODELS, DEFAULT_MODEL, EPOCHS, BATCH_SIZE,
-                    LR_HEAD, LR_BACKBONE, WEIGHT_DECAY, LABEL_SMOOTHING,
-                    WARMUP_EPOCHS, USE_MIXUP, USE_CUTMIX, USE_EMA, USE_FOCAL,
-                    TTA, SEED, model_path, ema_path)
+import config
+from config import (OUTPUT_DIR, MODELS, DEFAULT_MODEL, EPOCHS, TTA,
+                    model_path, ema_path)
 
 REGISTRY_PATH = os.path.join(OUTPUT_DIR, "registry.json")
 
@@ -79,41 +78,54 @@ def list_models():
         print(f"  {name:<32s} {acc*100:>8.2f}% {f1*100:>8.2f}% {date:>20s}")
 
 
-def register_model(model_name, metrics, epochs_run):
-    """Ajoute / met à jour le modèle dans le registry et retourne l'entrée créée."""
+def register_model(name, metrics, epochs_run, arch=None, overrides=None):
+    """Ajoute / met à jour un run dans la registry et retourne l'entrée créée.
+
+    name      : identifiant du run (clé dans la registry). Pour un entraînement
+                simple, name == arch. Pour le sweep, name = "resnet50_focal" tandis
+                que arch == "resnet50".
+    arch      : nom de l'architecture (utilisé par build_model au rechargement).
+                Défaut = name.
+    overrides : dict des hyperparams modifiés par rapport à la config par défaut.
+    """
+    arch = arch or name
+    overrides = overrides or {}
     reg = _load_registry()
-    ckpt  = model_path(model_name)
-    ekpt  = ema_path(model_name)
+    ckpt = model_path(name)
+    ekpt = ema_path(name)
     entry = {
-        "model": model_name,
-        "registered_at": datetime.datetime.now().isoformat(timespec="seconds"),
+        "name":           name,
+        "arch":           arch,
+        "registered_at":  datetime.datetime.now().isoformat(timespec="seconds"),
         "weights": {
             "raw": ckpt if os.path.exists(ckpt) else None,
             "ema": ekpt if os.path.exists(ekpt) else None,
         },
         "artifacts": {
-            "history":   os.path.join(OUTPUT_DIR, f"history_{model_name}.json"),
-            "curves":    os.path.join(OUTPUT_DIR, f"curves_{model_name}.png"),
-            "metrics":   os.path.join(OUTPUT_DIR, f"metrics_{model_name}.json"),
-            "report":    os.path.join(OUTPUT_DIR, f"report_{model_name}.txt"),
-            "overall":   os.path.join(OUTPUT_DIR, f"eval_{model_name}_overall.png"),
-            "per_class": os.path.join(OUTPUT_DIR, f"eval_{model_name}_per_class.png"),
-            "confusion": os.path.join(OUTPUT_DIR, f"eval_{model_name}_confusion.png"),
+            "history":   os.path.join(OUTPUT_DIR, f"history_{name}.json"),
+            "curves":    os.path.join(OUTPUT_DIR, f"curves_{name}.png"),
+            "metrics":   os.path.join(OUTPUT_DIR, f"metrics_{name}.json"),
+            "report":    os.path.join(OUTPUT_DIR, f"report_{name}.txt"),
+            "overall":   os.path.join(OUTPUT_DIR, f"eval_{name}_overall.png"),
+            "per_class": os.path.join(OUTPUT_DIR, f"eval_{name}_per_class.png"),
+            "confusion": os.path.join(OUTPUT_DIR, f"eval_{name}_confusion.png"),
         },
+        # Lecture LIVE de config.X — sweep.py peut modifier ces valeurs entre runs.
         "hyperparams": {
             "epochs_run":      epochs_run,
-            "batch_size":      BATCH_SIZE,
-            "warmup_epochs":   WARMUP_EPOCHS,
-            "lr_head":         LR_HEAD,
-            "lr_backbone":     LR_BACKBONE,
-            "weight_decay":    WEIGHT_DECAY,
-            "label_smoothing": LABEL_SMOOTHING,
-            "seed":            SEED,
-            "mixup":           USE_MIXUP,
-            "cutmix":          USE_CUTMIX,
-            "ema":             USE_EMA,
-            "focal":           USE_FOCAL,
-            "tta":             TTA,
+            "batch_size":      config.BATCH_SIZE,
+            "warmup_epochs":   config.WARMUP_EPOCHS,
+            "lr_head":         config.LR_HEAD,
+            "lr_backbone":     config.LR_BACKBONE,
+            "weight_decay":    config.WEIGHT_DECAY,
+            "label_smoothing": config.LABEL_SMOOTHING,
+            "seed":            config.SEED,
+            "mixup":           config.USE_MIXUP,
+            "cutmix":          config.USE_CUTMIX,
+            "ema":             config.USE_EMA,
+            "focal":           config.USE_FOCAL,
+            "tta":             config.TTA,
+            "overrides":       overrides,
         },
         "environment": {
             "python":    platform.python_version(),
@@ -124,33 +136,34 @@ def register_model(model_name, metrics, epochs_run):
         },
         "metrics": metrics,
     }
-    reg["models"][model_name] = entry
+    reg["models"][name] = entry
     _save_registry(reg)
-    print(f"\n  [✓] Modèle « {model_name} » enregistré dans {REGISTRY_PATH}")
+    print(f"\n  [✓] Run « {name} » (arch={arch}) enregistré dans {REGISTRY_PATH}")
     return entry
 
 
-def load_registered_model(model_name, prefer_ema=True):
-    """Recharge un modèle enregistré (architecture + meilleurs poids)."""
+def load_registered_model(name, prefer_ema=True):
+    """Recharge un run enregistré (architecture + meilleurs poids)."""
     reg = _load_registry()
-    if model_name not in reg["models"]:
+    if name not in reg["models"]:
         raise KeyError(
-            f"Modèle « {model_name} » introuvable dans la registry.\n"
+            f"Run « {name} » introuvable dans la registry.\n"
             f"  Liste : python run_local.py --list")
-    info  = reg["models"][model_name]
+    info  = reg["models"][name]
+    arch  = info.get("arch", info.get("model", name))  # compat ancienne registry
     paths = info["weights"]
     ckpt  = paths["ema"] if (prefer_ema and paths.get("ema")) else paths["raw"]
     if not ckpt or not os.path.exists(ckpt):
-        raise FileNotFoundError(f"Poids manquants pour {model_name}: {ckpt}")
+        raise FileNotFoundError(f"Poids manquants pour {name}: {ckpt}")
 
     # Imports tardifs : on évite de charger torch dans des sous-commandes (--list).
-    from model import build_model
+    from couche2.model import build_model
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = build_model(model_name, pretrained=False)
+    model = build_model(arch, pretrained=False)
     model.load_state_dict(torch.load(ckpt, map_location=device))
     model.to(device).eval()
     tag = "EMA" if (prefer_ema and paths.get("ema")) else "raw"
-    print(f"  [{tag}] Chargé : {ckpt}")
+    print(f"  [{tag}] Chargé : {ckpt}  (arch={arch})")
     return model, info
 
 
@@ -173,13 +186,13 @@ def run_pipeline(model_name=DEFAULT_MODEL, epochs=EPOCHS,
     # --- 1. Vérifications Couche 1 ------------------------------------------
     if not skip_check:
         _print_header("Couche 1 — vérification du dataset")
-        import check_dataset
+        from couche1 import check_dataset
         check_dataset.main()
 
     # --- 2. Entraînement Couche 2 -------------------------------------------
     if not skip_train:
         _print_header(f"Couche 2 — entraînement ({model_name})")
-        import train
+        from couche2 import train
         train.train_model(model_name, epochs=epochs)
     else:
         print("\n  --skip-train : on saute l'entraînement")
@@ -190,12 +203,12 @@ def run_pipeline(model_name=DEFAULT_MODEL, epochs=EPOCHS,
 
     # --- 3. Évaluation Couche 2 ---------------------------------------------
     _print_header(f"Couche 2 — évaluation ({model_name})")
-    import evaluate as eval_mod
+    from couche2 import evaluate as eval_mod
     metrics = eval_mod.evaluate_model(model_name, prefer_ema=True, use_tta=TTA)
 
     # --- 4. Enregistrement du modèle ----------------------------------------
     _print_header("Enregistrement du modèle")
-    entry = register_model(model_name, metrics, epochs_run=epochs)
+    entry = register_model(model_name, metrics, epochs_run=epochs, arch=model_name)
     test_acc = metrics["accuracy"]["test"]
     test_f1  = metrics["macro_f1"]["test"]
     print(f"  ✅ {model_name} : test acc {test_acc*100:.2f}%  ·  test F1 {test_f1*100:.2f}%")
