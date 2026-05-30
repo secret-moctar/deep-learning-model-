@@ -6,3 +6,5 @@ outputs/
 deep_learning.zip
 Annotation/
 *.zip
+Feature/*
+Annotation/*
