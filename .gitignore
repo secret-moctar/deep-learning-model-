@@ -8,3 +8,4 @@ Annotation/
 *.zip
 Feature/*
 Annotation/*
+.git.backup/
